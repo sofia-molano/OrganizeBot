@@ -1,13 +1,21 @@
-from machine import Pin, SoftSPI, PWM, time_pulse_us
+from time import sleep_ms, sleep
+from machine import Pin, SoftSPI
 from mfrc522 import MFRC522
-import time
-from time import sleep
 
-# Pines para el control de motores
-motor_izquierdo = PWM(Pin(5), freq=1000)  # Motor izquierdo (GPIO 5)
-motor_derecho = PWM(Pin(18), freq=1000)   # Motor derecho (GPIO 18)
+# Pines de los sensores infrarrojos (IR)
+sensor_1 = Pin(34, Pin.IN, Pin.PULL_UP)  
+sensor_2 = Pin(32, Pin.IN, Pin.PULL_UP)   
+sensor_3 = Pin(35, Pin.IN, Pin.PULL_UP)  
+sensor_4 = Pin(2, Pin.IN, Pin.PULL_UP)
+sensor_5 = Pin(33, Pin.IN, Pin.PULL_UP)
 
-# Pines para el RFID
+# Pines de control del motor
+IN1 = Pin(25, Pin.OUT)
+IN2 = Pin(26, Pin.OUT)
+IN3 = Pin(27, Pin.OUT)
+IN4 = Pin(14, Pin.OUT)
+
+# Pines del RFID
 sck = Pin(18, Pin.OUT)
 mosi = Pin(23, Pin.OUT)
 miso = Pin(19, Pin.IN)  # El pin MISO debe ser de entrada
@@ -23,85 +31,82 @@ spi = SoftSPI(
     miso=miso
 )
 
-# Pines para el sensor ultrasónico
-trigger = Pin(14, Pin.OUT)
-echo = Pin(27, Pin.IN)
+# Funciones de movimiento de motores
+def adelante():
+    IN1.value(1)  # Motor 1 avanza
+    IN2.value(0)
+    IN3.value(1)  # Motor 2 avanza
+    IN4.value(0)
 
-# Variable para almacenar el UID del RFID
-codigo_paquete = None
+def atras():
+    IN1.value(0)  # Motor 1 retrocede
+    IN2.value(1)
+    IN3.value(0)  # Motor 2 retrocede
+    IN4.value(1)
 
-# MOVIMIENTO DE LOS MOTORES
-def mover_adelante():
-    motor_izquierdo.duty(512)  # Avanzar ambos motores
-    motor_derecho.duty(512)
-    print("Avanzando en línea recta")
+def derecha():
+    IN1.value(1)  # Motor izquierdo avanza
+    IN2.value(0)
+    IN3.value(0)  # Motor derecho se detiene o retrocede
+    IN4.value(1)
 
-def detenerse():
-    motor_izquierdo.duty(0)  # Apagar ambos motores
-    motor_derecho.duty(0)
-    print("Deteniéndose")
+def izquierda():
+    IN1.value(0)  # Motor izquierdo se detiene o retrocede
+    IN2.value(1)
+    IN3.value(1)  # Motor derecho avanza
+    IN4.value(0)
 
-# FUNCIÓN LEER CÓDIGO DEL RFID
-def leer_RFID():
-    global codigo_paquete
+def detener():
+    IN1.value(0)
+    IN2.value(0)
+    IN3.value(0)
+    IN4.value(0)
+
+# Función para seguir la línea utilizando los sensores IR
+def seguir_linea():
+    while True:
+        # Leer el estado de los sensores
+        s1 = sensor_1.value()
+        s2 = sensor_2.value()
+        s3 = sensor_3.value()
+        s4 = sensor_4.value()
+        s5 = sensor_5.value()
+        
+        # Logica para seguir la línea basándonos en los sensores
+        if s2 == 0 and s3 == 0 and s4 == 0:  # Centrados en la línea
+            adelante()
+        elif s1 == 0 or s2 == 0:  # Gira hacia la izquierda si el sensor izquierdo detecta la línea
+            izquierda()
+        elif s4 == 0 or s5 == 0:  # Gira hacia la derecha si el sensor derecho detecta la línea
+            derecha()
+        else:
+            detener()  # Detenerse si no detecta la línea en ningún sensor
+            
+        sleep(0.1)  # Pequeña pausa para dar estabilidad
+
+# Función para leer RFID y luego seguir la línea
+def do_read():
     try:
-        print("Iniciando lectura de RFID...")
-        rdr = MFRC522(spi, sda)  # Inicializar el lector RFID fuera del bucle
         while True:
+            rdr = MFRC522(spi, sda)
+            uid = ""
             (stat, tag_type) = rdr.request(rdr.REQIDL)
             if stat == rdr.OK:
-                print("Etiqueta detectada")
                 (stat, raw_uid) = rdr.anticoll()
                 if stat == rdr.OK:
+                    # Leer la UID de la tarjeta RFID
                     uid = "0x%02x%02x%02x%02x" % (raw_uid[0], raw_uid[1], raw_uid[2], raw_uid[3])
-                    print(f"UID leído: {uid}")
-                    codigo_paquete = uid  # Asignar el UID leído a la variable global
-                    break  # Salir del bucle después de leer el UID correctamente
-            else:
-                print("Esperando una etiqueta...")
-            sleep(100)
+                    print("Tarjeta RFID detectada:", uid)
+                    
+                    # Iniciar el seguimiento de línea después de leer el RFID
+                    print("Iniciando seguimiento de línea...")
+                    seguir_linea()  # Comienza a seguir la línea
+
+                    # Agregar un pequeño delay entre lecturas
+                    sleep_ms(1000)
     except KeyboardInterrupt:
         print("Detenido por el usuario")
 
-# FUNCIÓN PARA ULTRASONIDO
-def medir_distancia():
-    # Asegurarse de que los pines trigger y echo estén inicializados correctamente
-    trigger.value(0)
-    time.sleep_us(2)
-    trigger.value(1)
-    time.sleep_us(10)
-    trigger.value(0)
-
-    # Medir la duración del pulso de eco
-    duracion = time_pulse_us(echo, 1, 30000)
-    
-    if duracion == -1:  # Si no se recibe un eco, devuelve una distancia fuera de rango
-        return float('inf')
-
-    # Calcular la distancia (en cm)
-    distancia = (duracion / 2) * 0.0343
-    return distancia
-
-# Lógica de movimiento basada en el RFID y el sensor ultrasónico
-def seguir_instrucciones():
-    while True:
-        distancia = medir_distancia()
-        
-        if distancia < 10:  # Si el obstáculo está a menos de 10 cm
-            print("Obstáculo detectado, deteniéndose")
-            detenerse()  # Detener los motores
-        else:
-            mover_adelante()  # Seguir avanzando si no hay obstáculos
-        
-        sleep(1)
-
-# Main
 if __name__ == "__main__":
-    # Leer el UID del paquete a través del RFID
-    leer_RFID()
-    
-    # Si se ha leído un UID, iniciar el movimiento y la detección de obstáculos
-    if codigo_paquete:
-        print(f"UID leído, iniciando movimiento. UID: {codigo_paquete}")
-        seguir_instrucciones()
-
+    print("Esperando una tarjeta RFID...")
+    do_read()
