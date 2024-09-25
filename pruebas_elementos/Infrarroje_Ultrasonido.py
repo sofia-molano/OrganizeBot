@@ -34,16 +34,16 @@ def atras():
     IN4.value(1)
 
 def derecha():
-    IN1.value(1)
-    IN2.value(0)
-    IN3.value(0)
-    IN4.value(1)
-
-def izquierda():
     IN1.value(0)
     IN2.value(1)
     IN3.value(1)
     IN4.value(0)
+
+def izquierda():
+    IN1.value(1)
+    IN2.value(0)
+    IN3.value(0)
+    IN4.value(1)
 
 def detener():
     IN1.value(0)
@@ -110,3 +110,6 @@ def control_robot():
 
 if __name__ == "__main__":
     control_robot()
+
+
+#Molano, coy, Melendez, Pascuas
