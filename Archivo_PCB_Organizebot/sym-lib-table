@@ -1,0 +1,6 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "ESP32 Wroom")(type "KiCad")(uri "C:/Users/holas/Documents/KiCad/8.0/projects/Taller S1 2024/Librerias2/ESP32-DEVKIT-V1/ESP32-DEVKIT-V1.kicad_sym")(options "")(descr ""))
+  (lib (name "JACK 2.1 DC")(type "KiCad")(uri "C:/Users/holas/Documents/KiCad/8.0/projects/Taller S1 2024/Librerias2/EJ503A/EJ503A.kicad_sym")(options "")(descr ""))
+  (lib (name "MH-CD42")(type "KiCad")(uri "C:/Users/holas/Documents/KiCad/8.0/projects/Taller S1 2024/Librerias2/mh-cd42/cd42.kicad_sym")(options "")(descr ""))
+)
